@@ -1,10 +1,10 @@
-# Cover Whale Go
+# Sencillo Go
 
 This is somewhat of an opinionated set of packages for Go development. By no means is this going to be forced as the only way to write Go, but it's a good starting point for most things.
 
 ## Code Generation
 
-The `cwgoctl` code generator will create an opinionated Go application for you. It will create a Makefile, Dockerfile, started cmd package, starter server package, goreleaser config, and github actions.
+The `sgoctl` code generator will create an opinionated Go application for you. It will create a Makefile, Dockerfile, started cmd package, starter server package, goreleaser config, and github actions.
 
 ### Pre-Reqs
 To use the targets in the Makefile you will need:
