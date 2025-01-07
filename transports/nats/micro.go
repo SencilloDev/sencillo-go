@@ -21,17 +21,27 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
-	cwerrors "github.com/SencilloDev/sencillo-go/errors"
+	sderrors "github.com/SencilloDev/sencillo-go/errors"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/segmentio/ksuid"
 )
 
 type HandlerWithErrors func(*slog.Logger, micro.Request) error
+type AppHandler func(r micro.Request, h HandlerContext) error
+
+type HandlerContext struct {
+	Logger *slog.Logger
+	Conn   *nats.Conn
+}
+
+type AppContext struct {
+	Conn   *nats.Conn
+	Logger *slog.Logger
+}
 
 type ClientError interface {
 	Error() string
@@ -62,15 +72,15 @@ func handleNotify(stopChan chan<- string) {
 
 // ErrorHandler wraps a normal micro endpoint and allows for returning errors natively. Errors are
 // checked and if an error is a client error, details are returned, otherwise a 500 is returned and logged
-func ErrorHandler(logger *slog.Logger, h HandlerWithErrors) micro.HandlerFunc {
+func ErrorHandler(a AppContext, handler AppHandler) micro.HandlerFunc {
 	return func(r micro.Request) {
 		start := time.Now()
-		id, err := SubjectToRequestID(r.Subject())
+		id, err := MsgID(r)
 		if err != nil {
-			handleRequestError(logger, cwerrors.NewClientError(err, 400), r)
+			handleRequestError(a.Logger, sderrors.NewClientError(err, 400), r)
 			return
 		}
-		reqLogger := logger.With("request_id", id, "path", r.Subject())
+		reqLogger := a.Logger.With("request_id", id, "path", r.Subject())
 		defer func() {
 			reqLogger.Info(fmt.Sprintf("duration %dms", time.Since(start).Milliseconds()))
 		}()
@@ -78,8 +88,12 @@ func ErrorHandler(logger *slog.Logger, h HandlerWithErrors) micro.HandlerFunc {
 		if err := buildQueryHeaders(r); err != nil {
 			handleRequestError(reqLogger, err, r)
 		}
+		ctx := HandlerContext{
+			Logger: reqLogger,
+			Conn:   a.Conn,
+		}
 
-		err = h(reqLogger, r)
+		err = handler(r, ctx)
 		if err == nil {
 			return
 		}
@@ -88,7 +102,7 @@ func ErrorHandler(logger *slog.Logger, h HandlerWithErrors) micro.HandlerFunc {
 	}
 }
 
-// Create CW specific headers from the NATS bridge plugin headers
+// Create Sencillo specific headers from the NATS bridge plugin headers
 func buildQueryHeaders(r micro.Request) error {
 	headers := nats.Header(r.Headers())
 	query := headers.Get("X-NatsBridge-UrlQuery")
@@ -122,26 +136,35 @@ func handleRequestError(logger *slog.Logger, err error, r micro.Request) {
 	r.Error("500", "internal server error", []byte(`{"error": "internal server error"}`))
 }
 
-func SubjectToRequestID(s string) (string, error) {
-	split := strings.Split(s, ".")
-	if len(split) < 3 {
-		return "", fmt.Errorf("invalid subject")
-	}
-
-	id := split[3]
-
-	_, err := ksuid.Parse(id)
-	if err != nil {
-		return "", fmt.Errorf("invalid ksuid request ID")
+func MsgID(r micro.Request) (string, error) {
+	id := r.Headers().Get("x-request-id")
+	if id == "" {
+		return "", fmt.Errorf("required request ID not found")
 	}
 
 	return id, nil
 }
 
-func RequestLogger(l *slog.Logger, subject string) (*slog.Logger, error) {
-	id, err := SubjectToRequestID(subject)
+func RequestLogger(l *slog.Logger, r micro.Request) (*slog.Logger, error) {
+	id, err := MsgID(r)
 	if err != nil {
 		return nil, err
 	}
 	return l.With("request_id", id), nil
+}
+
+func NewMsgWithID() *nats.Msg {
+	headers := map[string][]string{
+		"x-request-id": {ksuid.New().String()},
+	}
+	return &nats.Msg{
+		Header: headers,
+	}
+}
+
+func RequestToMsg(r micro.Request) *nats.Msg {
+	return &nats.Msg{
+		Header: nats.Header(r.Headers()),
+		Data:   r.Data(),
+	}
 }
