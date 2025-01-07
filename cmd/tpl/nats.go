@@ -25,10 +25,18 @@ import (
 	"os"
 	"time"
 
-	cwerrors "github.com/SencilloDev/sencillo-go/errors"
+	sderrors "github.com/SencilloDev/sencillo-go/errors"
+	sdnats "github.com/SencilloDev/sencillo-go/transports/nats"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
 )
+
+type Handler func(micro.Request, CustomCtx) error
+
+type CustomCtx struct {
+	HandlerCtx sdnats.HandlerContext
+	Something  string
+}
 
 type MathRequest struct {
 	A int {{ $tick }}json:"a"{{ $tick }}
@@ -39,35 +47,45 @@ type MathResponse struct {
 	Result int {{ $tick }}json:"result"{{ $tick }}
 }
 
-func SpecificHandler(logger *slog.Logger, r micro.Request) error {
-	r.Respond([]byte("in the specific handler"))
-
-	return nil
+func Wrapper(handler Handler, custom CustomCtx) sdnats.AppHandler {
+	return func(r micro.Request, h sdnats.HandlerContext) error {
+		custom.HandlerCtx = h
+		return handler(r, custom)
+	}
 }
 
-func Add(logger *slog.Logger, r micro.Request) error {
+func SpecificHandler(r micro.Request, c CustomCtx) error {
+	fmt.Println(c.Something)
+	msg := sdnats.RequestToMsg(r)
+	msg.Subject = "testing.things"
+	resp, err := c.HandlerCtx.Conn.RequestMsg(msg, 1*time.Second)
+	if err != nil {
+		return err
+	}
+
+	return r.Respond(resp.Data)
+}
+
+func Add(r micro.Request, h sdnats.HandlerContext) error {
 	var mr MathRequest
 	if err := json.Unmarshal(r.Data(), &mr); err != nil {
-		return cwerrors.NewClientError(err, 400)
+		return sderrors.NewClientError(err, 400)
 	}
 
 	resp := MathResponse{Result: mr.A + mr.B}
 
-	r.RespondJSON(resp)
-
-	return nil
+	return r.RespondJSON(resp)
 }
 
-func Subtract(logger *slog.Logger, r micro.Request) error {
+func Subtract(r micro.Request, h sdnats.HandlerContext) error {
 	var mr MathRequest
 	if err := json.Unmarshal(r.Data(), &mr); err != nil {
-		return cwerrors.NewClientError(err, 400)
+		return sderrors.NewClientError(err, 400)
 	}
 
 	resp := MathResponse{Result: mr.A - mr.B}
 
-	r.RespondJSON(resp)
-	return nil
+	return r.RespondJSON(resp)
 }
 
 func WatchForConfig(logger *slog.LevelVar, js nats.JetStreamContext) {

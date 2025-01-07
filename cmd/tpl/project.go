@@ -233,129 +233,141 @@ func init() {
 // The base subject must always begin with prime/local.services.<service-name>.*
 func baseSubject() string {
 	if viper.GetBool("use_traffic_shaping") {
-		return "local.services.{{ .Name }}.*.math"
+		return "local.services.{{ .Name }}"
 	}
 
-	return "prime.services.{{ .Name }}.*.math"
+	return "sencillo.services.{{ .Name }}"
 }
 
 func start(cmd *cobra.Command, args []string ) error {
-    level := new(slog.LevelVar)
-    level.Set(slog.LevelInfo)
-    logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-	Level: level,
-    }))
-    {{ if .EnableHTTP }}
-    ctx := context.Background()
+	level := new(slog.LevelVar)
+	level.Set(slog.LevelInfo)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	    Level: level,
+	}))
+	{{ if .EnableHTTP }}
+	ctx := context.Background()
 
-    {{ if .EnableTelemetry -}}
-    // create new metrics exporter
-    exp, err := metrics.NewOTLPExporter(ctx, "{{ .MetricsUrl }}", otlptracehttp.WithInsecure())
-    if err != nil {
-        return err
-    }
+	{{ if .EnableTelemetry -}}
+	// create new metrics exporter
+	exp, err := metrics.NewOTLPExporter(ctx, "{{ .MetricsUrl }}", otlptracehttp.WithInsecure())
+	if err != nil {
+	    return err
+	}
 
-    // create global tracer provider
-    tp, err := metrics.RegisterGlobalOTLPProvider(exp, "{{ .Name }}", Version)
-    if err != nil {
-        return err
-    }
-    {{- end }}
+	// create global tracer provider
+	tp, err := metrics.RegisterGlobalOTLPProvider(exp, "{{ .Name }}", Version)
+	if err != nil {
+	    return err
+	}
+	{{- end }}
 
-    s := sdhttp.NewHTTPServer(
-        sdhttp.SetServerPort(viper.GetInt("port")),
-        {{ if .EnableTelemetry -}}
-        sdhttp.SetTracerProvider(tp),
-        {{- end }}
-    )
+	s := sdhttp.NewHTTPServer(
+	    sdhttp.SetServerPort(viper.GetInt("port")),
+	    {{ if .EnableTelemetry -}}
+	    sdhttp.SetTracerProvider(tp),
+	    {{- end }}
+	)
 
-    errChan := make(chan error, 1)
-    {{- end }}
+	errChan := make(chan error, 1)
+	{{- end }}
 
-    {{ if .EnableGraphql }}resolver := &graph.Resolver{}{{- end }}
+	{{ if .EnableGraphql }}resolver := &graph.Resolver{}{{- end }}
 
-    config := micro.Config{
-    	Name:        "{{ .Name }}",
-    	Version:     "0.0.1",
-    	Description: "An example application",
-    }
+	config := micro.Config{
+		Name:        "{{ .Name }}",
+		Version:     "0.0.1",
+		Description: "An example application",
+	}
 
-    nc, err := newNatsConnection("{{ .Name }}-server")
-    if err != nil {
-    	return err
-    }
-    defer nc.Close()
+	nc, err := newNatsConnection("{{ .Name }}-server")
+	if err != nil {
+		return err
+	}
+	defer nc.Close()
 
-    // uncomment for config watching
-    //js, err := nc.JetStream()
-    //if err != nil {
-    //    return err
-    //}
+	ctx := sdnats.AppContext{
+		Conn:   nc,
+		Logger: logger,
+	}
 
-    // uncomment to enable logging over NATS
-    //logger.SetOutput(sdnats.NewNatsLogger("prime.logs.{{ .Name }}", nc))
-    
-    svc, err := micro.AddService(nc, config)
-    if err != nil {
-	slog.Error(err.Error())
-	os.Exit(1)
-    }
-    
-    // add a singular handler as an endpoint
-    svc.AddEndpoint("specific", sdnats.ErrorHandler(logger, service.SpecificHandler), micro.WithEndpointSubject(fmt.Sprintf("%s.specific.get", baseSubject())))
-    
-    // add a handler group. The base subject is defined in AddGroup and then the specific handler subjects are defined 
-    // with micro.WithEndpointSubject
-    grp := svc.AddGroup(baseSubject(), micro.WithGroupQueueGroup("{{ .Name }}"))
-    grp.AddEndpoint("add",
-    	sdnats.ErrorHandler(logger, service.Add),
-    	micro.WithEndpointMetadata(map[string]string{
-    		"description":     "adds two numbers",
-    		"format":          "application/json",
-    		"request_schema":  schemaString(&service.MathRequest{}),
-    		"response_schema": schemaString(&service.MathResponse{}),
-    	}),
-	micro.WithEndpointSubject("add.get"),
-    )
-    grp.AddEndpoint("subtract",
-    	sdnats.ErrorHandler(logger, service.Subtract),
-    	micro.WithEndpointMetadata(map[string]string{
-    		"description":     "subtracts two numbers",
-    		"format":          "application/json",
-    		"request_schema":  schemaString(&service.MathRequest{}),
-    		"response_schema": schemaString(&service.MathResponse{}),
-    	}),
-	micro.WithEndpointSubject("subtract.get"),
-    )
-    
-    // uncomment to enable config watching
-    //go service.WatchForConfig(level, js)
-    {{ if not .EnableHTTP }}
-    logger.Info(fmt.Sprintf("service %s %s started", svc.Info().Name, svc.Info().ID))
+	custom := service.CustomCtx{
+		Something: "testing",
+	}
 
-    health := func(ch chan<- string, s micro.Service) {
-            a := <-nc.StatusChanged(nats.CLOSED)
-            ch <- fmt.Sprintf("%s %s", a.String(), nc.LastError())
-    }
+	// uncomment for config watching
+	//js, err := nc.JetStream()
+	//if err != nil {
+	//    return err
+	//}
 
-    return sdnats.HandleNotify(svc, health)
-    {{- end }}
+	// uncomment to enable logging over NATS
+	//logger.SetOutput(sdnats.NewNatsLogger("prime.logs.{{ .Name }}", nc))
+	
+	svc, err := micro.AddService(nc, config)
+	if err != nil {
+	    slog.Error(err.Error())
+	    os.Exit(1)
+	}
+	
+	// add a singular handler as an endpoint
+	svc.AddEndpoint(
+		"specific",
+		sdnats.ErrorHandler(ctx, service.Wrapper(service.SpecificHandler, custom)),
+		micro.WithEndpointSubject(fmt.Sprintf("%s.GET.specific", baseSubject())),
+	)
+	
+	// add a handler group. The base subject is defined in AddGroup and then the specific handler subjects are defined 
+	// with micro.WithEndpointSubject
+	grp := svc.AddGroup(baseSubject(), micro.WithGroupQueueGroup("{{ .Name }}"))
+	grp.AddEndpoint("add",
+		sdnats.ErrorHandler(ctx, service.Add),
+		micro.WithEndpointMetadata(map[string]string{
+			"description":     "adds two numbers",
+			"format":          "application/json",
+			"request_schema":  schemaString(&service.MathRequest{}),
+			"response_schema": schemaString(&service.MathResponse{}),
+		}),
+	    micro.WithEndpointSubject("math.GET.add"),
+	)
+	grp.AddEndpoint("subtract",
+		sdnats.ErrorHandler(ctx, service.Subtract),
+		micro.WithEndpointMetadata(map[string]string{
+			"description":     "subtracts two numbers",
+			"format":          "application/json",
+			"request_schema":  schemaString(&service.MathRequest{}),
+			"response_schema": schemaString(&service.MathResponse{}),
+		}),
+	    micro.WithEndpointSubject("math.GET.subtract"),
+	)
+	
+	// uncomment to enable config watching
+	//go service.WatchForConfig(level, js)
+	{{ if not .EnableHTTP }}
+	logger.Info(fmt.Sprintf("service %s %s started", svc.Info().Name, svc.Info().ID))
 
-    {{ if .EnableHTTP }}
-    service.Watch(n, "prime.{{ .Name }}.*")
+	health := func(ch chan<- string, s micro.Service) {
+	        a := <-nc.StatusChanged(nats.CLOSED)
+	        ch <- fmt.Sprintf("%s %s", a.String(), nc.LastError())
+	}
 
-    s.RegisterSubRouter("/api/v1", service.GetRoutes(s.Logger), service.ExampleMiddleware(s.Logger))
-    {{ if .EnableGraphql }}
-    srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
-    s.RegisterSubRouter("/", service.GetPlayground(srv))
-    s.RegisterSubRouter("/api/v1/graphql", service.GetApiQuery(srv))
-    {{- end }}
+	return sdnats.HandleNotify(svc, health)
+	{{- end }}
 
-    go s.Serve(errChan)
-    s.AutoHandleErrors(ctx, errChan)
-    return nil
-    {{- end }}
+	{{ if .EnableHTTP }}
+	service.Watch(n, "prime.{{ .Name }}.*")
 
+	s.RegisterSubRouter("/api/v1", service.GetRoutes(s.Logger), service.ExampleMiddleware(s.Logger))
+	{{ if .EnableGraphql }}
+	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))
+	s.RegisterSubRouter("/", service.GetPlayground(srv))
+	s.RegisterSubRouter("/api/v1/graphql", service.GetApiQuery(srv))
+	{{- end }}
+
+	go s.Serve(errChan)
+	s.AutoHandleErrors(ctx, errChan)
+	return nil
+	{{- end }}
 } 
 
 func schemaString(s any) string {
