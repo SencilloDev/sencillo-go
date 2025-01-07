@@ -120,7 +120,7 @@ func buildQueryHeaders(r micro.Request) error {
 }
 
 func GetQueryHeaders(headers micro.Headers, key string) []string {
-	k := fmt.Sprintf("X-CW-%s", key)
+	k := fmt.Sprintf("X-Sencillo-%s", key)
 	return headers.Values(k)
 }
 
