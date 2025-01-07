@@ -137,7 +137,7 @@ func handleRequestError(logger *slog.Logger, err error, r micro.Request) {
 }
 
 func MsgID(r micro.Request) (string, error) {
-	id := r.Headers().Get("x-request-id")
+	id := r.Headers().Get("X-Request-ID")
 	if id == "" {
 		return "", fmt.Errorf("required request ID not found")
 	}
@@ -155,7 +155,7 @@ func RequestLogger(l *slog.Logger, r micro.Request) (*slog.Logger, error) {
 
 func NewMsgWithID() *nats.Msg {
 	headers := map[string][]string{
-		"x-request-id": {ksuid.New().String()},
+		"X-Request-ID": {ksuid.New().String()},
 	}
 	return &nats.Msg{
 		Header: headers,
