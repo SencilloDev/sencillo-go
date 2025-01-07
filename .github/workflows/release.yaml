@@ -22,5 +22,5 @@ jobs:
           version: latest
           args: release --clean
         env:
-          GOPRIVATE: github.com/CoverWhale
+          GOPRIVATE: github.com/SencilloDev
           GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}

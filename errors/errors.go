@@ -16,6 +16,7 @@ package errors
 
 import (
 	"fmt"
+	"strings"
 )
 
 // ClientError represents a non-server error
@@ -24,28 +25,28 @@ type ClientError struct {
 	Status int
 
 	// Details are a nicely formatted client error
-	Details string
+	Details []string
 
 	//DetailedError is the actual error to be logged
-	DetailedError error
+	DetailedErrors []error
 }
 
 type ClientErrorOpt func(*ClientError)
 
 func (c ClientError) Error() string {
-	return c.Details
+	return strings.Join(c.Details, ", ")
 }
 
 func (c ClientError) Body() []byte {
-	return []byte(fmt.Sprintf(`{"error": %q}`, c.Details))
+	return []byte(fmt.Sprintf(`{"errors": [%s]}`, strings.Join(c.Details, ",")))
 }
 
 func (c ClientError) Code() int {
 	return c.Status
 }
 
-func (c ClientError) LoggedError() string {
-	return c.DetailedError.Error()
+func (c ClientError) LoggedError() []error {
+	return c.DetailedErrors
 }
 
 func (c ClientError) As(target any) bool {
@@ -53,17 +54,22 @@ func (c ClientError) As(target any) bool {
 	return ok
 }
 
-func WithDetailedError(err error) ClientErrorOpt {
-	return func(c *ClientError) {
-		c.DetailedError = err
-	}
+func NewClientError(err error, code int, opts ...ClientErrorOpt) ClientError {
+	var errors []error
+	errors = append(errors, err)
+
+	return MultipleClientErrors(errors, code, opts...)
 }
 
-func NewClientError(err error, code int, opts ...ClientErrorOpt) ClientError {
+func MultipleClientErrors(errs []error, code int, opts ...ClientErrorOpt) ClientError {
+	var errors []string
+	for _, v := range errs {
+		errors = append(errors, fmt.Sprintf(`%q`, v.Error()))
+	}
 	ce := ClientError{
-		Status:        code,
-		Details:       err.Error(),
-		DetailedError: err,
+		Status:         code,
+		Details:        errors,
+		DetailedErrors: errs,
 	}
 
 	for _, v := range opts {

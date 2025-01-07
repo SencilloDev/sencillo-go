@@ -47,7 +47,7 @@ type ClientError interface {
 	Error() string
 	Code() int
 	Body() []byte
-	LoggedError() string
+	LoggedError() []error
 }
 
 func HandleNotify(s micro.Service, healthFuncs ...func(chan<- string, micro.Service)) error {
@@ -127,13 +127,16 @@ func GetQueryHeaders(headers micro.Headers, key string) []string {
 func handleRequestError(logger *slog.Logger, err error, r micro.Request) {
 	ce, ok := err.(ClientError)
 	if ok {
-		logger.Error(ce.LoggedError())
+		for _, v := range ce.LoggedError() {
+			logger.Error(v.Error())
+		}
 		r.Error(fmt.Sprintf("%d", ce.Code()), http.StatusText(ce.Code()), ce.Body())
+		return
 	}
 
 	logger.Error(err.Error())
 
-	r.Error("500", "internal server error", []byte(`{"error": "internal server error"}`))
+	r.Error("500", "internal server error", []byte(`{"errors": ["internal server error"]}`))
 }
 
 func MsgID(r micro.Request) (string, error) {
