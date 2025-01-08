@@ -20,7 +20,7 @@ To use the utility simply follow these steps:
 1. `go mod init github.com/SencilloDev/myapp`
 
 2. Run `cwgoctl` with your options.  For example: `cwgoctl new server --name myapp`
-    > Cli documentation is [here](docs/cwgo.md)
+    > Cli documentation is [here](docs/sgoctl.md)
 
 3. Run `make tidy`
     > Pulls in all dependencies and vendors them
