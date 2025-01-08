@@ -19,7 +19,7 @@ To use the utility simply follow these steps:
 
 1. `go mod init github.com/SencilloDev/myapp`
 
-2. Run `cwgoctl` with your options.  For example: `cwgoctl new server --name myapp`
+2. Run `sgoctl` with your options.  For example: `sgoctl new server --name myapp`
     > Cli documentation is [here](docs/sgoctl.md)
 
 3. Run `make tidy`
@@ -35,7 +35,7 @@ To use the utility simply follow these steps:
 
 ### Extra flags
 
-The utility has various flags to enable features that may be useful for the new app. For example: `cwgoctl new server --name myapp --enable-nats --enable-graphql`
+The utility has various flags to enable features that may be useful for the new app. For example: `sgoctl new server --name myapp --enable-nats --enable-graphql`
 
 1. `--enable-nats`
 	> Sets up a NATS integration.
@@ -74,7 +74,7 @@ import (
 	"log"
 	"net/http"
 
-	cwhttp "github.com/SencilloDev/sencillo-go/transports/http"
+	sdhttp "github.com/SencilloDev/sencillo-go/transports/http"
 )
 
 func testing(w http.ResponseWriter, r *http.Request) {
@@ -82,11 +82,11 @@ func testing(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	s := cwhttp.NewHTTPServer(
-		cwhttp.SetServerPort(9090),
+	s := sdhttp.NewHTTPServer(
+		sdhttp.SetServerPort(9090),
 	)
 
-	routes := []cwhttp.Route{
+	routes := []sdhttp.Route{
 		{
 			Method: http.MethodGet,
 			Path: "/testing",
@@ -122,7 +122,7 @@ func myHandler(w http.ResponseWriter, r *http.Request) error {
 
 }
 
-var routes = []cwhttp.Route{
+var routes = []sdhttp.Route{
 	{
 		Method: http.MethodGet,
 		Path: "/myhandler",
@@ -142,7 +142,7 @@ passing a data source:
 
 ```go
 import (
-	cwhttp "github.com/SencilloDev/sencillo-go/transports/http"
+	sdhttp "github.com/SencilloDev/sencillo-go/transports/http"
 )
 
 var db *Database
@@ -154,11 +154,11 @@ func myHandler(w http.ResponseWriter, r *http.Request, db *Database) {
 	json.NewEncoder(w).Encode(user)
 }
 
-var routes = []cwhttp.Route{
+var routes = []sdhttp.Route{
 	{
 		Method: http.MethodGet,
 		Path: "/users/{userId}",
-		Handler: cwhttp.HandleWithContext(myHandler, db),
+		Handler: sdhttp.HandleWithContext(myHandler, db),
 	},
 }
 
@@ -183,7 +183,7 @@ func myHandler(w http.ResponseWriter, r *http.Request, obj MyObject) {
 	.../
 }
 
-var routes = []cwhttp.Route{
+var routes = []sdhttp.Route{
 	{
 		Method: http.MethodGet,
 		Path: "/testing",
