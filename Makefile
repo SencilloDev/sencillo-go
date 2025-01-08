@@ -23,7 +23,7 @@ GOARCH=$(shell go env GOARCH)
 sgoctl: ## Builds the binary on the current platform
 	go build -a -ldflags "-w -X '$(PKG)/cmd.Version=$(VERSION)'" -o $(PROJECT_NAME)
 
-docs: cwgoctl ## Builds the cli documentation
+docs: sgoctl ## Builds the cli documentation
 	mkdir -p docs
 	./$(PROJECT_NAME) docs
 
