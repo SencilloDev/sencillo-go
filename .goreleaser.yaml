@@ -1,13 +1,13 @@
 env:
   - IMAGE_TAG={{.Tag}}
   
-project_name: cwgoctl
+project_name: sgoctl
 
 archives:
   - format: binary
 
 builds:
-  - ldflags: "-extldflags= -w -X 'github.com/CoverWhale/coverwhale-go/cmd.Version={{.Tag}}'"
+  - ldflags: "-extldflags= -w -X 'github.com/SencilloDev/sencillo-go/cmd.Version={{.Tag}}'"
     flags:
       - -mod=vendor
     env:
