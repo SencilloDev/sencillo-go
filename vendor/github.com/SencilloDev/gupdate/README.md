@@ -12,8 +12,8 @@ Create a project and then use gupdate to get the latest release and update the b
 
 ```
 gh := gupdate.GitHubProject{
-	Name:     "coverwhale-go",
-	Owner:    "CoverWhale",
+	Name:     "sencillo-go",
+	Owner:    "SencilloDev",
 	Platform: runtime.GOOS,
 	Arch:     runtime.GOARCH,
 	ChecksumFunc: gupdate.GoReleaserChecksum,

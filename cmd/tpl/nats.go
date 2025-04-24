@@ -19,9 +19,12 @@ func Nats() []byte {
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
@@ -29,13 +32,14 @@ import (
 	sdnats "github.com/SencilloDev/sencillo-go/transports/nats"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
+	"go.opentelemetry.io/otel/trace"
 )
 
-type Handler func(micro.Request, CustomCtx) error
+type Handler func(context.Context, micro.Request, CustomCtx) error
 
 type CustomCtx struct {
 	HandlerCtx sdnats.HandlerContext
-	Something  string
+	URL  string
 }
 
 type MathRequest struct {
@@ -48,25 +52,53 @@ type MathResponse struct {
 }
 
 func Wrapper(handler Handler, custom CustomCtx) sdnats.AppHandler {
-	return func(r micro.Request, h sdnats.HandlerContext) error {
+	return func(ctx context.Context, r micro.Request, h sdnats.HandlerContext) error {
 		custom.HandlerCtx = h
-		return handler(r, custom)
+		return handler(ctx, r, custom)
 	}
 }
 
-func SpecificHandler(r micro.Request, c CustomCtx) error {
-	fmt.Println(c.Something)
-	msg := sdnats.RequestToMsg(r)
-	msg.Subject = "testing.things"
-	resp, err := c.HandlerCtx.Conn.RequestMsg(msg, 1*time.Second)
+func SpecificHandler(ctx context.Context, r micro.Request, c CustomCtx) error {
+	span := trace.SpanFromContext(ctx)
+	span.AddEvent("calling json typicode")
+	client := http.Client{
+		Timeout: 10 * time.Second,
+	}
+	req, err := http.NewRequest("GET", c.URL, nil)
 	if err != nil {
 		return err
 	}
 
-	return r.Respond(resp.Data)
+	reqCtx := req.WithContext(ctx)
+	resp, err := client.Do(reqCtx)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return sderrors.NewClientError(fmt.Errorf("something went wrong status: %d", resp.StatusCode), resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	msg := sdnats.RequestToMsg(r)
+	msg.Subject = "testing.things"
+	msg.Data = body
+
+	nResp, err := c.HandlerCtx.Conn.RequestMsg(msg, 1*time.Second)
+	if err != nil {
+		return err
+	}
+
+	return r.Respond(nResp.Data)
+
 }
 
-func Add(r micro.Request, h sdnats.HandlerContext) error {
+func Add(ctx context.Context, r micro.Request, h sdnats.HandlerContext) error {
 	var mr MathRequest
 	if err := json.Unmarshal(r.Data(), &mr); err != nil {
 		return sderrors.NewClientError(err, 400)
@@ -77,7 +109,7 @@ func Add(r micro.Request, h sdnats.HandlerContext) error {
 	return r.RespondJSON(resp)
 }
 
-func Subtract(r micro.Request, h sdnats.HandlerContext) error {
+func Subtract(ctx context.Context, r micro.Request, h sdnats.HandlerContext) error {
 	var mr MathRequest
 	if err := json.Unmarshal(r.Data(), &mr); err != nil {
 		return sderrors.NewClientError(err, 400)

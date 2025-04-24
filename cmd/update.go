@@ -20,7 +20,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/CoverWhale/gupdate"
+	"github.com/SencilloDev/gupdate"
 	"github.com/briandowns/spinner"
 )
 

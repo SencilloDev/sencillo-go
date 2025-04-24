@@ -40,9 +40,9 @@ github.com/99designs/gqlgen v0.17.43 h1:I4SYg6ahjowErAQcHFVKy5EcWuwJ3+Xw9z2fLpuF
 github.com/99designs/gqlgen v0.17.43/go.mod h1:lO0Zjy8MkZgBdv4T1U91x09r0e0WFOdhVUutlQs1Rsc=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/CoverWhale/gupdate v0.0.2 h1:mCrdX/5+s0meSt2TXlGorU5fQL3tC26YyjJmuyVkR7k=
-github.com/CoverWhale/gupdate v0.0.2/go.mod h1:Jn5d+j3x/vQY5TQMXUTrtEz6Rmfm890smOPIIzyyfgc=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
+github.com/SencilloDev/gupdate v0.0.0-20250416015622-a1ca4089901b h1:oawjufGcXpTlK8qoDXGVh1UG9jsNMDkRugS89dGA6tc=
+github.com/SencilloDev/gupdate v0.0.0-20250416015622-a1ca4089901b/go.mod h1:dtkkwvjbLOIpc5HwE71ewy+AH5R5bDB9+ceube37f/Y=
 github.com/agnivade/levenshtein v1.1.1 h1:QY8M92nrzkmr798gCo3kmMyqXFzdQVpxLlGPRBij0P8=
 github.com/agnivade/levenshtein v1.1.1/go.mod h1:veldBMzWxcCG2ZvUTKD2kJNRdCk5hVbJomOvKkmgYbo=
 github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883 h1:bvNMNQO63//z+xNgfBlViaCIJKLlCJ6/fmUseuG0wVQ=

@@ -5,7 +5,7 @@ go 1.22.2
 require (
 	cuelang.org/go v0.4.3
 	github.com/99designs/gqlgen v0.17.43
-	github.com/CoverWhale/gupdate v0.0.2
+	github.com/SencilloDev/gupdate v0.0.0-20250416015622-a1ca4089901b
 	github.com/briandowns/spinner v1.23.0
 	github.com/invopop/jsonschema v0.12.0
 	github.com/nats-io/nats.go v1.33.0

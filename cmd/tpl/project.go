@@ -208,12 +208,14 @@ import (
     "github.com/nats-io/nats.go/micro"
     "github.com/nats-io/nats.go"
     sdnats "github.com/SencilloDev/sencillo-go/transports/nats"
+    "github.com/honeycombio/otel-config-go/otelconfig"
     "github.com/spf13/cobra"
     "github.com/spf13/viper"
-    {{ if and .EnableHTTP .EnableTelemetry -}}"github.com/CoverWhale/coverwhale-go/metrics"
+    {{ if and .EnableHTTP .EnableTelemetry -}}"github.com/SencilloDev/sencillo-go/metrics"
     "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"{{- end }}
     {{ if .EnableGraphql }}"github.com/99designs/gqlgen/graphql/handler"
     "{{ .Module }}/graph"{{- end}}
+    "go.opentelemetry.io/otel"
 )
 
 var startCmd = &cobra.Command{
@@ -286,13 +288,21 @@ func start(cmd *cobra.Command, args []string ) error {
 	}
 	defer nc.Close()
 
-	ctx := sdnats.AppContext{
-		Conn:   nc,
-		Logger: logger,
+	otelShutdown, err := otelconfig.ConfigureOpenTelemetry()
+	if err != nil {
+		return err
+	}
+	defer otelShutdown()
+
+	appCtx := sdnats.AppContext{
+		Conn:       nc,
+		Logger:	    logger,
+		Tracer:     otel.Tracer("{{ .Name }}"),
+		Propagator: otel.GetTextMapPropagator(),
 	}
 
 	custom := service.CustomCtx{
-		Something: "testing",
+		URL: "https://jsonplaceholder.typicode.com/posts/1",
 	}
 
 	// uncomment for config watching
@@ -313,7 +323,7 @@ func start(cmd *cobra.Command, args []string ) error {
 	// add a singular handler as an endpoint
 	svc.AddEndpoint(
 		"specific",
-		sdnats.ErrorHandler(ctx, service.Wrapper(service.SpecificHandler, custom)),
+		sdnats.ErrorHandler("specific", appCtx, service.Wrapper(service.SpecificHandler, custom)),
 		micro.WithEndpointSubject(fmt.Sprintf("%s.GET.specific", baseSubject())),
 	)
 	
@@ -321,7 +331,7 @@ func start(cmd *cobra.Command, args []string ) error {
 	// with micro.WithEndpointSubject
 	grp := svc.AddGroup(baseSubject(), micro.WithGroupQueueGroup("{{ .Name }}"))
 	grp.AddEndpoint("add",
-		sdnats.ErrorHandler(ctx, service.Add),
+		sdnats.ErrorHandler("add", appCtx, service.Add),
 		micro.WithEndpointMetadata(map[string]string{
 			"description":     "adds two numbers",
 			"format":          "application/json",
@@ -331,7 +341,7 @@ func start(cmd *cobra.Command, args []string ) error {
 	    micro.WithEndpointSubject("math.GET.add"),
 	)
 	grp.AddEndpoint("subtract",
-		sdnats.ErrorHandler(ctx, service.Subtract),
+		sdnats.ErrorHandler("subtract", appCtx, service.Subtract),
 		micro.WithEndpointMetadata(map[string]string{
 			"description":     "subtracts two numbers",
 			"format":          "application/json",

@@ -88,5 +88,5 @@ func RegisterGlobalOTLPProvider(e *otlptrace.Exporter, serviceName, version stri
 }
 
 func NewTracer(ctx context.Context, name string) (context.Context, trace.Span) {
-	return otel.Tracer("github.com/CoverWhale/coverwhale-go/metrics").Start(ctx, name)
+	return otel.Tracer("github.com/SencilloDev/sencillo-go/metrics").Start(ctx, name)
 }
