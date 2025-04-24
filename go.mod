@@ -6,12 +6,11 @@ require (
 	cuelang.org/go v0.4.3
 	github.com/99designs/gqlgen v0.17.43
 	github.com/CoverWhale/gupdate v0.0.2
-	github.com/CoverWhale/logr v0.0.0-20240513164108-a4fd5504b303
 	github.com/briandowns/spinner v1.23.0
 	github.com/invopop/jsonschema v0.12.0
 	github.com/nats-io/nats.go v1.33.0
-	github.com/newrelic/go-agent/v3 v3.20.3
 	github.com/prometheus/client_golang v1.15.1
+	github.com/sagikazarmark/slog-shim v0.1.0
 	github.com/segmentio/ksuid v1.0.4
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
@@ -65,7 +64,6 @@ require (
 	github.com/protocolbuffers/txtpbfmt v0.0.0-20201118171849-f6a6b3f636fc // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
-	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sosodev/duration v1.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect

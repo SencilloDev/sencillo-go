@@ -15,6 +15,7 @@
 package nats
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -28,19 +29,28 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/segmentio/ksuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type HandlerWithErrors func(*slog.Logger, micro.Request) error
-type AppHandler func(r micro.Request, h HandlerContext) error
+type AppHandler func(ctx context.Context, r micro.Request, h HandlerContext) error
+type microHeaderCarrier micro.Headers
 
 type HandlerContext struct {
-	Logger *slog.Logger
-	Conn   *nats.Conn
+	Logger     *slog.Logger
+	Conn       *nats.Conn
+	Tracer     trace.Tracer
+	Propagator propagation.TextMapPropagator
 }
 
 type AppContext struct {
-	Conn   *nats.Conn
-	Logger *slog.Logger
+	Conn       *nats.Conn
+	Logger     *slog.Logger
+	Tracer     trace.Tracer
+	Propagator propagation.TextMapPropagator
 }
 
 type ClientError interface {
@@ -48,6 +58,27 @@ type ClientError interface {
 	Code() int
 	Body() []byte
 	LoggedError() []error
+}
+
+func (m microHeaderCarrier) Get(key string) string {
+	return micro.Headers(m).Get(key)
+}
+
+func (m microHeaderCarrier) Set(key, val string) {
+	m[key] = []string{val}
+}
+
+func (m microHeaderCarrier) Keys() []string {
+	keys := make([]string, 0, len(micro.Headers(m)))
+	for k := range nats.Header(m) {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (a AppContext) InjectTraceHeaders(ctx context.Context, headers map[string][]string) {
+	a.Propagator.Inject(ctx, microHeaderCarrier(headers))
+
 }
 
 func HandleNotify(s micro.Service, healthFuncs ...func(chan<- string, micro.Service)) error {
@@ -72,8 +103,9 @@ func handleNotify(stopChan chan<- string) {
 
 // ErrorHandler wraps a normal micro endpoint and allows for returning errors natively. Errors are
 // checked and if an error is a client error, details are returned, otherwise a 500 is returned and logged
-func ErrorHandler(a AppContext, handler AppHandler) micro.HandlerFunc {
-	return func(r micro.Request) {
+func ErrorHandler(name string, a AppContext, handler AppHandler) micro.Handler {
+	ctx := context.Background()
+	return micro.ContextHandler(ctx, func(ctx context.Context, r micro.Request) {
 		start := time.Now()
 		id, err := MsgID(r)
 		if err != nil {
@@ -88,18 +120,31 @@ func ErrorHandler(a AppContext, handler AppHandler) micro.HandlerFunc {
 		if err := buildQueryHeaders(r); err != nil {
 			handleRequestError(reqLogger, err, r)
 		}
-		ctx := HandlerContext{
-			Logger: reqLogger,
-			Conn:   a.Conn,
+		handlerCtx := HandlerContext{
+			Logger:     reqLogger,
+			Conn:       a.Conn,
+			Tracer:     a.Tracer,
+			Propagator: a.Propagator,
 		}
 
-		err = handler(r, ctx)
+		headers := r.Headers()
+		newCtx := a.Propagator.Extract(ctx, microHeaderCarrier(headers))
+		startCtx, span := a.Tracer.Start(newCtx, name)
+		span.SetAttributes(attribute.KeyValue{Key: "X-Request-ID", Value: attribute.StringValue(id)})
+		defer span.End()
+
+		err = handler(startCtx, r, handlerCtx)
 		if err == nil {
+			span.SetStatus(codes.Ok, "success")
 			return
 		}
 
+		span.SetStatus(codes.Error, err.Error())
+		span.RecordError(err)
+
 		handleRequestError(reqLogger, err, r)
-	}
+
+	})
 }
 
 // Create Sencillo specific headers from the NATS bridge plugin headers
