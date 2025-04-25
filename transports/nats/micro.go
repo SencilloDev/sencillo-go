@@ -117,7 +117,7 @@ func ErrorHandler(name string, a AppContext, handler AppHandler) micro.Handler {
 		}
 		reqLogger := a.Logger.With("request_id", id, "path", r.Subject())
 		defer func() {
-			reqLogger.Info(fmt.Sprintf("duration %dms", time.Since(start).Milliseconds()))
+			reqLogger.Info("duration", "milliseconds", time.Since(start).Milliseconds())
 		}()
 
 		if err := buildQueryHeaders(r); err != nil {
