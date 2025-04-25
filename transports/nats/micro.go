@@ -80,6 +80,10 @@ func (h HandlerContext) InjectTraceHeaders(ctx context.Context, headers map[stri
 	h.Propagator.Inject(ctx, microHeaderCarrier(headers))
 }
 
+func InjectTraceHeaders(ctx context.Context, p propagation.TextMapPropagator, headers map[string][]string) {
+	p.Inject(ctx, microHeaderCarrier(headers))
+}
+
 func HandleNotify(s micro.Service, healthFuncs ...func(chan<- string, micro.Service)) error {
 	stopChan := make(chan string, 1)
 	for _, v := range healthFuncs {
