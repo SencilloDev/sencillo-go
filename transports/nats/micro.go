@@ -76,9 +76,8 @@ func (m microHeaderCarrier) Keys() []string {
 	return keys
 }
 
-func (a AppContext) InjectTraceHeaders(ctx context.Context, headers map[string][]string) {
-	a.Propagator.Inject(ctx, microHeaderCarrier(headers))
-
+func (h HandlerContext) InjectTraceHeaders(ctx context.Context, headers map[string][]string) {
+	h.Propagator.Inject(ctx, microHeaderCarrier(headers))
 }
 
 func HandleNotify(s micro.Service, healthFuncs ...func(chan<- string, micro.Service)) error {
