@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
+	"go.opentelemetry.io/otel"
 )
 
 func schemaString(s any) string {
@@ -53,6 +55,13 @@ func main() {
 	}
 	defer nc.Close()
 
+	appCtx := sdnats.AppContext{
+		Logger:     logger,
+		Conn:       nc,
+		Tracer:     otel.Tracer("dot"),
+		Propagator: otel.GetTextMapPropagator(),
+	}
+
 	svc, err := micro.AddService(nc, config)
 	if err != nil {
 		slog.Error(err.Error())
@@ -60,12 +69,12 @@ func main() {
 	}
 
 	// add a singular handler as an endpoint
-	svc.AddEndpoint("specific", sdnats.ErrorHandler(logger, specificHandler), micro.WithEndpointSubject("prime.example.specific"))
+	svc.AddEndpoint("specific", sdnats.ErrorHandler("specific", appCtx, specificHandler), micro.WithEndpointSubject("prime.example.specific"))
 
 	// add a handler group
 	grp := svc.AddGroup("prime.services.example.*.math", micro.WithGroupQueueGroup("example"))
 	grp.AddEndpoint("add",
-		sdnats.ErrorHandler(logger, add),
+		sdnats.ErrorHandler("add", appCtx, add),
 		micro.WithEndpointMetadata(map[string]string{
 			"description":     "adds two numbers",
 			"format":          "application/json",
@@ -73,7 +82,7 @@ func main() {
 			"response_schema": schemaString(&MathResponse{}),
 		}))
 	grp.AddEndpoint("subtract",
-		sdnats.ErrorHandler(logger, subtract),
+		sdnats.ErrorHandler("subtract", appCtx, subtract),
 		micro.WithEndpointMetadata(map[string]string{
 			"description":     "subtracts two numbers",
 			"format":          "application/json",
@@ -84,7 +93,7 @@ func main() {
 	sdnats.HandleNotify(svc)
 }
 
-func specificHandler(logger *slog.Logger, r micro.Request) error {
+func specificHandler(ctx context.Context, r micro.Request, h sdnats.HandlerContext) error {
 	r.Respond([]byte("in the specific handler"))
 
 	return nil
@@ -99,7 +108,7 @@ type MathResponse struct {
 	Result int `json:"result"`
 }
 
-func add(logger *slog.Logger, r micro.Request) error {
+func add(ctx context.Context, r micro.Request, h sdnats.HandlerContext) error {
 	var mr MathRequest
 	if err := json.Unmarshal(r.Data(), &mr); err != nil {
 		return sderrors.NewClientError(err, 400)
@@ -112,7 +121,7 @@ func add(logger *slog.Logger, r micro.Request) error {
 	return nil
 }
 
-func subtract(logger *slog.Logger, r micro.Request) error {
+func subtract(ctx context.Context, r micro.Request, h sdnats.HandlerContext) error {
 	var mr MathRequest
 	if err := json.Unmarshal(r.Data(), &mr); err != nil {
 		return sderrors.NewClientError(err, 400)
