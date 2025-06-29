@@ -20,6 +20,20 @@ VERSION := $$(git describe HEAD)
 GOOS=$(shell go env GOOS)
 GOARCH=$(shell go env GOARCH)
 
+deps: ## Get dependencies
+	go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+
+lint: deps ## Lint the files
+	go vet
+	gocyclo -over 15 -ignore "generated" ./
+
+test: lint ## Run unittests
+	go test -v ./...
+
+coverage: ## Create test coverage report
+	go test -cover ./...
+	go test ./... -coverprofile=cover.out && go tool cover -html=cover.out -o coverage.html
+
 sgoctl: ## Builds the binary on the current platform
 	go build -a -ldflags "-w -X '$(PKG)/cmd.Version=$(VERSION)'" -o $(PROJECT_NAME)
 
