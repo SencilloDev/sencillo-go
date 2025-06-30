@@ -122,18 +122,13 @@ ENTRYPOINT ["./{{ .Name }}ctl"]
 }
 
 func GoReleaser() []byte {
-	return []byte(`env:
-  - IMAGE_TAG={{.Tag}}
-
-
+	return []byte(`version: 2
 project_name: [% .Name %]ctl
 
 builds:
-  - ldflags: "-extldflags= -w -X '[% .Module %]/cmd.Version={{.Tag}}'"
-    flags:
-      - -mod=vendor
-    env:
-      - "CGO_ENABLED=0"
+  - env:
+      - CGO_ENABLED=0
+      - IMAGE_TAG={{.Tag}}
       - "GO111MODULE=on"
     goos:
       - linux
@@ -142,8 +137,38 @@ builds:
     goarch:
       - amd64
       - arm64
-source:
-  enabled: true
+    ldflags: "-extldflags= -w -X 'github.com/SencilloDev/[% .Name %]/cmd.Version={{.Tag}}'"
+    flags:
+      - -mod=vendor
+
+archives:
+  - formats: [binary]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        formats: [binary]
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  footer: >-
+
+    ---
+
+    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
+
 `)
 }
 
