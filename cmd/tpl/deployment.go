@@ -67,29 +67,7 @@ docs: ## Builds the cli documentation
 schema: ## Generates boilerplate code from the graph/schema.graphqls file
 {{"\t"}}go run github.com/99designs/gqlgen update
 
-build-tester:
-{{"\t"}}docker build --target tester --build-arg VERSION=${VERSION} -t ${TEST_IMAGE} .
-
-ci-lint: build-tester
-{{"\t"}}docker run --rm ${TEST_IMAGE} go vet
-{{"\t"}}docker run --rm ${TEST_IMAGE} gocyclo -over 16 -ignore "generated" ./
-
-ci-unit: build-tester
-{{"\t"}}docker run --rm ${TEST_IMAGE} go test -v ./...
-
-ci-cover: build-tester
-{{"\t"}}mkdir -p ./output
-{{"\t"}}docker run --rm -v ./output:/out ${TEST_IMAGE} go test -cover ./...
-{{"\t"}}docker run --rm -v ./output:/out ${TEST_IMAGE} go test ./... -coverprofile=/out/cover.out
-{{"\t"}}docker run --rm -v ./output:/out ${TEST_IMAGE} go tool cover -html=/out/cover.out -o /out/coverage.html
-
-ci-test: ci-lint ci-unit ci-cover
-
-ci-build:
-{{"\t"}}docker build --build-arg VERSION=${VERSION} -t ${IMAGE} .
-
 clean: ## Reset everything
-{{"\t"}}docker run --rm -v ./output:/out alpine rm -rf /out/*
 {{"\t"}}git clean -fd
 {{"\t"}}git clean -fx
 {{"\t"}}git reset --hard
