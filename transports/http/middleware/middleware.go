@@ -15,8 +15,10 @@
 package middleware
 
 import (
+	"bufio"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -63,6 +65,37 @@ type StatusRec struct {
 func (r *StatusRec) WriteHeader(status int) {
 	r.Status = status
 	r.ResponseWriter.WriteHeader(status)
+}
+
+// Write implements io.Writer. It also sets Status = 200 if not set yet.
+func (r *StatusRec) Write(b []byte) (int, error) {
+	if r.Status == 0 {
+		r.Status = http.StatusOK
+	}
+	return r.ResponseWriter.Write(b)
+}
+
+// Flush implements http.Flusher if the underlying writer supports it.
+func (r *StatusRec) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Implement Hijack to support WebSockets
+func (r *StatusRec) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := r.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, http.ErrNotSupported
+}
+
+// Implement Push for HTTP/2 Server Push
+func (r *StatusRec) Push(target string, opts *http.PushOptions) error {
+	if p, ok := r.ResponseWriter.(http.Pusher); ok {
+		return p.Push(target, opts)
+	}
+	return http.ErrNotSupported
 }
 
 // CodesStats is a middleware that captures the status code and method of the request for metrics collection with Prometheus
