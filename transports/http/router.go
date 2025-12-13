@@ -25,8 +25,9 @@ import (
 	"syscall"
 	"time"
 
+	sderrors "github.com/SencilloDev/sencillo-go/errors"
 	"github.com/SencilloDev/sencillo-go/metrics"
-	cwmiddleware "github.com/SencilloDev/sencillo-go/transports/http/middleware"
+	sdmiddleware "github.com/SencilloDev/sencillo-go/transports/http/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sagikazarmark/slog-shim"
@@ -112,6 +113,26 @@ func HandleWithContext[T any](h func(http.ResponseWriter, *http.Request, T), ctx
 	}
 }
 
+func HandleWithContextError[T any](h func(http.ResponseWriter, *http.Request, T) error, ctx T, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := h(w, r, ctx)
+		if err == nil {
+			return
+		}
+
+		var ce sderrors.ClientError
+		if errors.As(err, &ce) {
+			w.WriteHeader(ce.Status)
+			w.Write([]byte(ce.Body()))
+			return
+		}
+
+		logger.Error(fmt.Sprintf("status=%d, err=%v", http.StatusInternalServerError, err))
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(ErrInternalError.Error()))
+	}
+}
+
 func (s *Server) getHealth() {
 	if s.TracerProvider != nil {
 		s.Router.Handle("GET /healthz", otelhttp.NewHandler(http.HandlerFunc(healthz), "healthz:GET"))
@@ -161,7 +182,7 @@ func (e *ErrHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ce *ClientError
+	var ce sderrors.ClientError
 	if errors.As(err, &ce) {
 		w.WriteHeader(ce.Status)
 		w.Write([]byte(ce.Body()))
@@ -191,7 +212,7 @@ func (s *Server) RegisterSubRouter(prefix string, routes []Route, middleware ...
 	counter := metrics.NewCounterVec(fmt.Sprintf("http_requests%s", name), "HTTP requests by status, path, and method", []string{"code", "method", "path"})
 	hist := metrics.NewHistogramVec(fmt.Sprintf("http_request_latency%s", name), "HTTP latency by status, path, and method", []string{"code", "method", "path"})
 
-	reqWrapped := cwmiddleware.RequestID(subRouter)
+	reqWrapped := sdmiddleware.RequestID(subRouter)
 
 	for _, m := range middleware {
 		reqWrapped = m(reqWrapped)
@@ -209,7 +230,7 @@ func (s *Server) RegisterSubRouter(prefix string, routes []Route, middleware ...
 
 	s.Exporter.Metrics = append(s.Exporter.Metrics, counter, hist)
 
-	s.Router.Handle(prefixWithSlash, cwmiddleware.Logging(cwmiddleware.CodeStats(http.StripPrefix(stripped, reqWrapped), counter, hist)))
+	s.Router.Handle(prefixWithSlash, sdmiddleware.Logging(sdmiddleware.CodeStats(http.StripPrefix(stripped, reqWrapped), counter, hist)))
 
 	return s
 }

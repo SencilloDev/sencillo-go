@@ -24,12 +24,6 @@ GOOS=$(shell go env GOOS)
 GOARCH=$(shell go env GOARCH)
 GOPRIVATE=github.com/SencilloDev
 
-# Version and image repo are overriden by the ci pipeline
-VERSION=x.x.x
-IMAGE_REPO=local/${shell basename ${PWD}}
-IMAGE=${IMAGE_REPO}:${VERSION}
-TEST_IMAGE:=${IMAGE_REPO}-test:${VERSION}
-
 .PHONY: all build docker deps clean test coverage lint docker-local edgedb k8s-up k8s-down docker-delete docs update-local deploy-local
 
 all: build
@@ -57,7 +51,7 @@ tidy: ## Pull in dependencies
 fmt: ## Format All files
 {{"\t"}}go fmt ./...
 
-{{ .Name }}ctl: ## Builds the binary on the current platform
+build: ## Builds the binary on the current platform
 {{"\t"}}go build -mod=vendor -a -ldflags "-w -X '$(PKG)/cmd.Version=$(VERSION)'" -o $(PROJECT_NAME)ctl
 
 docs: ## Builds the cli documentation
@@ -217,7 +211,7 @@ jobs:
 
 func Gitignore() []byte {
 	return []byte(`{{ .Name }}ctl
-cwgotctl*
+sgoctl*
 dist/
 output/
 `)
