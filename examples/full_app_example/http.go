@@ -21,19 +21,20 @@ import (
 	"log/slog"
 	"net/http"
 
-	cwhttp "github.com/SencilloDev/sencillo-go/transports/http"
+	sderrors "github.com/SencilloDev/sencillo-go/errors"
+	sdhttp "github.com/SencilloDev/sencillo-go/transports/http"
 )
 
 type clientHandlerFunc func(http.ResponseWriter, *http.Request, ClientManager) error
 
 func getErrorDetails(err error) (int, string) {
-	clientError, ok := err.(*cwhttp.ClientError)
+	clientError, ok := err.(*sderrors.ClientError)
 	if !ok {
 		log.Printf("An error ocurred: %v", err)
 		return 500, http.StatusText(http.StatusInternalServerError)
 	}
 
-	return clientError.Status, clientError.Details
+	return clientError.Status, string(clientError.Body())
 }
 
 func clientHandler(h clientHandlerFunc, cm ClientManager) http.HandlerFunc {
@@ -69,34 +70,30 @@ func (a *Application) createProduct(w http.ResponseWriter, r *http.Request) erro
 	return nil
 }
 
-func getProductByID(w http.ResponseWriter, r *http.Request, pm ProductManager) {
+func getProductByID(w http.ResponseWriter, r *http.Request, pm ProductManager) error {
 	id := r.PathValue("id")
 
 	p := GetProduct(id, pm)
 
-	if err := json.NewEncoder(w).Encode(p); err != nil {
-		log.Println(err)
-	}
+	return json.NewEncoder(w).Encode(p)
 }
 
-func getProducts(w http.ResponseWriter, r *http.Request, pm ProductManager) {
+func getProducts(w http.ResponseWriter, r *http.Request, pm ProductManager) error {
 	p := GetAllProducts(pm)
 
-	if err := json.NewEncoder(w).Encode(p); err != nil {
-		log.Println(err)
-	}
+	return json.NewEncoder(w).Encode(p)
 }
 
 func createClient(w http.ResponseWriter, r *http.Request, cm ClientManager) error {
 	var c Client
 
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		return cwhttp.NewClientError(err, http.StatusBadRequest)
+		return sderrors.NewClientError(err, http.StatusBadRequest)
 	}
 
 	a, err := NewClient(c.Name, SetClientProducts(c.Products))
 	if err != nil {
-		return cwhttp.NewClientError(err, http.StatusBadRequest)
+		return sderrors.NewClientError(err, http.StatusBadRequest)
 	}
 
 	if err := a.Save(cm); err != nil {
@@ -131,22 +128,22 @@ func getClientByID(w http.ResponseWriter, r *http.Request, cm ClientManager) err
 	return nil
 }
 
-func (a *Application) buildRoutes(l *slog.Logger) []cwhttp.Route {
-	return []cwhttp.Route{
+func (a *Application) buildRoutes(l *slog.Logger) []sdhttp.Route {
+	return []sdhttp.Route{
 		{
 			Method:  http.MethodGet,
 			Path:    "/products/{id}",
-			Handler: cwhttp.HandleWithContext(getProductByID, a.ProductManager),
+			Handler: sdhttp.HandleWithContextError(getProductByID, a.ProductManager, l),
 		},
 		{
 			Method:  http.MethodGet,
 			Path:    "/products",
-			Handler: cwhttp.HandleWithContext(getProducts, a.ProductManager),
+			Handler: sdhttp.HandleWithContextError(getProducts, a.ProductManager, l),
 		},
 		{
 			Method:  http.MethodPost,
 			Path:    "/clients",
-			Handler: clientHandler(createClient, a.ClientManager),
+			Handler: sdhttp.HandleWithContextError(createClient, a.ClientManager, l),
 		},
 		{
 			Method:  http.MethodGet,
@@ -161,7 +158,7 @@ func (a *Application) buildRoutes(l *slog.Logger) []cwhttp.Route {
 		{
 			Method: http.MethodPost,
 			Path:   "/products",
-			Handler: &cwhttp.ErrHandler{
+			Handler: &sdhttp.ErrHandler{
 				Handler: a.createProduct,
 				Logger:  l,
 			},

@@ -25,7 +25,6 @@ import (
 	"syscall"
 	"time"
 
-	sderrors "github.com/SencilloDev/sencillo-go/errors"
 	"github.com/SencilloDev/sencillo-go/metrics"
 	sdmiddleware "github.com/SencilloDev/sencillo-go/transports/http/middleware"
 	"github.com/prometheus/client_golang/prometheus"
@@ -120,9 +119,9 @@ func HandleWithContextError[T any](h func(http.ResponseWriter, *http.Request, T)
 			return
 		}
 
-		var ce sderrors.ClientError
+		var ce ClientError
 		if errors.As(err, &ce) {
-			w.WriteHeader(ce.Status)
+			w.WriteHeader(ce.Code())
 			w.Write([]byte(ce.Body()))
 			return
 		}
@@ -182,9 +181,9 @@ func (e *ErrHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ce sderrors.ClientError
+	var ce ClientError
 	if errors.As(err, &ce) {
-		w.WriteHeader(ce.Status)
+		w.WriteHeader(ce.Code())
 		w.Write([]byte(ce.Body()))
 		return
 	}

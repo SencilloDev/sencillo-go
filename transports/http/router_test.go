@@ -23,6 +23,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	sderrors "github.com/SencilloDev/sencillo-go/errors"
 )
 
 var (
@@ -116,12 +118,12 @@ func TestErrHandlerServeHTTP(t *testing.T) {
 		{
 			name: "400 error", handler: ErrHandler{
 				Handler: func(w http.ResponseWriter, r *http.Request) error {
-					return NewClientError(ErrTestingError, 400)
+					return sderrors.NewClientError(ErrTestingError, 400)
 				},
 
 				Logger: slog.New(slog.NewTextHandler(os.Stdout, nil)),
 			},
-			err:    NewClientError(ErrTestingError, 400),
+			err:    sderrors.NewClientError(ErrTestingError, 400),
 			status: 400,
 		},
 		{
@@ -164,11 +166,11 @@ func TestJsonHandlerServeHTTP(t *testing.T) {
 		{
 			name: "400 error", handler: ErrHandler{
 				Handler: JsonHandler(func(w http.ResponseWriter, r *http.Request) error {
-					return NewClientError(ErrTestingError, 400)
+					return sderrors.NewClientError(ErrTestingError, 400)
 				}),
 				Logger: slog.New(slog.NewTextHandler(os.Stdout, nil)),
 			},
-			err:         NewClientError(ErrTestingError, 400),
+			err:         sderrors.NewClientError(ErrTestingError, 400),
 			status:      400,
 			contentType: "application/json",
 		},

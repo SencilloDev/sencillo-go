@@ -23,18 +23,19 @@ import (
 	"os"
 	"time"
 
+	sderrors "github.com/SencilloDev/sencillo-go/errors"
 	"github.com/SencilloDev/sencillo-go/metrics"
-	cwhttp "github.com/SencilloDev/sencillo-go/transports/http"
+	sdhttp "github.com/SencilloDev/sencillo-go/transports/http"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 )
 
-func getRoutes(l *slog.Logger) []cwhttp.Route {
-	return []cwhttp.Route{
+func getRoutes(l *slog.Logger) []sdhttp.Route {
+	return []sdhttp.Route{
 		{
 			Method: http.MethodGet,
 			Path:   "/testing-things/{testID}",
-			Handler: &cwhttp.ErrHandler{
+			Handler: &sdhttp.ErrHandler{
 				Handler: testing,
 				Logger:  l,
 			},
@@ -62,7 +63,7 @@ func testing(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if ce != "" {
-		return cwhttp.NewClientError(fmt.Errorf("uh oh something is wrong"), 400)
+		return sderrors.NewClientError(fmt.Errorf("uh oh something is wrong"), 400)
 	}
 
 	// get new span
@@ -123,9 +124,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	s := cwhttp.NewHTTPServer(
-		cwhttp.SetServerPort(7070),
-		cwhttp.SetTracerProvider(tp),
+	s := sdhttp.NewHTTPServer(
+		sdhttp.SetServerPort(7070),
+		sdhttp.SetTracerProvider(tp),
 	)
 
 	s.RegisterSubRouter("/api/v1/", getRoutes(s.Logger), exampleMiddleware(s.Logger))
